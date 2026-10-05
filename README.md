@@ -38,8 +38,15 @@ Luego visita `http://localhost:3000`.
 | Mediano   | 50     |
 | Pequeño   | 100    |
 
+## Power-Ups
+
+| Power-Up | Efecto | Duración |
+| -------- | ------ | -------- |
+| **Velocidad** (🟢 círculo verde) | Duplica la velocidad de rotación y empuje de la nave | 5 segundos |
+
 ## Características
 
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
+- Power-ups aleatorios: Velocidad para movimiento potenciado

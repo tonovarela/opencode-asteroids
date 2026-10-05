@@ -132,6 +132,7 @@ class Ship {
     this.thrusting     = false;
     this.invincible    = 3;
     this.shootCooldown = 0;
+    this.speedUpTimer  = 0;
     this.dead          = false;
   }
 
@@ -139,10 +140,16 @@ class Ship {
     if (this.dead) return;
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
+    if (this.speedUpTimer  > 0) this.speedUpTimer  -= dt;
 
-    const ROT   = 3.5;   // rad/s
-    const THRUST = 260;  // px/s²
+    const ROT_BASE   = 3.5;    // rad/s
+    const THRUST_BASE = 260;   // px/s²
     const DRAG   = 0.987;
+
+    // Aplicar multiplicador de velocidad si está activo
+    const speedMultiplier = this.speedUpTimer > 0 ? 2 : 1;
+    const ROT = ROT_BASE * speedMultiplier;
+    const THRUST = THRUST_BASE * speedMultiplier;
 
     if (keys['ArrowLeft'])  this.angle -= ROT * dt;
     if (keys['ArrowRight']) this.angle += ROT * dt;
@@ -235,8 +242,39 @@ class Particle {
   }
 }
 
+// ── PowerUp (Velocidad) ───────────────────────────────────────────────────────
+class PowerUp {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 8;
+    this.dead = false;
+    this.pulseTime = 0;
+  }
+
+  update(dt) {
+    this.pulseTime += dt;
+  }
+
+  draw() {
+    const pulse = Math.sin(this.pulseTime * 4) * 0.3 + 0.7; // Pulsación
+    const radius = this.radius * pulse;
+    
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.7)'; // Verde brillante
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.strokeStyle = 'rgba(0, 255, 0, 1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 // ── Estado del juego ──────────────────────────────────────────────────────────
-let ship, bullets, asteroids, particles;
+let ship, bullets, asteroids, particles, powerups;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
@@ -253,11 +291,22 @@ function spawnAsteroids(count) {
   }
 }
 
+function spawnPowerUp() {
+  const SAFE_DIST = 130;
+  let x, y;
+  do {
+    x = rand(0, W);
+    y = rand(0, H);
+  } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
+  powerups.push(new PowerUp(x, y));
+}
+
 function initGame() {
   ship          = new Ship();
   bullets   = [];
   asteroids = [];
   particles = [];
+  powerups  = [];
   score  = 0;
   lives  = 3;
   level  = 1;
@@ -269,6 +318,7 @@ function nextLevel() {
   level++;
   bullets   = [];
   particles = [];
+  powerups  = [];
   ship.reset();
   spawnAsteroids(3 + level);
 }
@@ -316,6 +366,7 @@ function update(dt) {
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
   particles.forEach(p => p.update(dt));
+  powerups.forEach(p => p.update(dt));
 
   bullets   = bullets.filter(b => !b.dead);
   particles = particles.filter(p => !p.dead);
@@ -343,6 +394,22 @@ function update(dt) {
         killShip();
         break;
       }
+    }
+  }
+
+  // Nave vs PowerUp
+  for (const p of powerups) {
+    if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
+      p.dead = true;
+      ship.speedUpTimer = 5;  // Activar velocidad por 5 segundos
+    }
+  }
+  powerups = powerups.filter(p => !p.dead);
+
+  // Spawn aleatorio de PowerUp
+  if (Math.random() < 0.02) {  // ~2% chance cada frame
+    if (powerups.length < 1) {  // Máximo 1 PowerUp en pantalla
+      spawnPowerUp();
     }
   }
 
@@ -378,6 +445,13 @@ function drawHUD() {
   ctx.textAlign = 'center';
   ctx.fillText(`NIVEL ${level}`, W / 2, 26);
 
+  // Mostrar timer de velocidad si está activo
+  if (ship.speedUpTimer > 0) {
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(`VELOCIDAD: ${ship.speedUpTimer.toFixed(1)}s`, W / 2, 50);
+  }
+
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
@@ -400,6 +474,7 @@ function draw() {
   particles.forEach(p => p.draw());
   asteroids.forEach(a => a.draw());
   bullets.forEach(b => b.draw());
+  powerups.forEach(p => p.draw());
   ship.draw();
 
   drawHUD();
