@@ -262,6 +262,9 @@ class Ship {
     this.shootCooldown = 0;
     this.speedUpTimer  = 0;
     this.dead          = false;
+    this.shieldActive  = false;
+    this.shieldCooldown = 0;
+    this.shieldCooldownDuration = 3;
   }
 
   update(dt) {
@@ -269,6 +272,12 @@ class Ship {
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.speedUpTimer  > 0) this.speedUpTimer  -= dt;
+    if (this.shieldCooldown > 0) this.shieldCooldown -= dt;
+
+    // Activar/desactivar escudo con tecla S
+    if (pressed('KeyS') && this.shieldCooldown <= 0) {
+      this.shieldActive = !this.shieldActive;
+    }
 
     const ROT_BASE   = 3.5;    // rad/s
     const THRUST_BASE = 260;   // px/s²
@@ -331,6 +340,19 @@ class Ship {
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
       ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.stroke();
+    }
+
+    // Escudo: anillo pulsante cian
+    if (this.shieldActive) {
+      const pulse = Math.sin(gameTime * 5) * 0.3 + 0.7;  // Pulsación suave
+      const shieldRadius = 32 * pulse;  // Radio pulsante (22-32 px)
+      const alpha = pulse * 0.6;  // Transparencia pulsante
+      
+      ctx.strokeStyle = `rgba(0, 255, 255, ${alpha.toFixed(2)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -406,6 +428,7 @@ let ship, bullets, asteroids, particles, powerups, shootingStars;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let gameTime = 0; // Contador de tiempo para animaciones
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -543,7 +566,15 @@ function update(dt) {
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
       if (dist(ship, a) < ship.radius + a.radius * 0.82) {
-        killShip();
+        if (ship.shieldActive) {
+          // Escudo activo: desactivar y activar cooldown
+          ship.shieldActive = false;
+          ship.shieldCooldown = ship.shieldCooldownDuration;
+          explode(ship.x, ship.y, 5); // Pequeña explosión
+        } else {
+          // Sin escudo: matar nave
+          killShip();
+        }
         break;
       }
     }
@@ -618,6 +649,24 @@ function drawHUD() {
     ctx.fillText(`VELOCIDAD: ${ship.speedUpTimer.toFixed(1)}s`, W / 2, 50);
   }
 
+  // Mostrar estado del escudo
+  if (ship.shieldCooldown > 0) {
+    ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`ESCUDO RECARGANDO: ${ship.shieldCooldown.toFixed(1)}s`, W - 14, 26);
+  } else if (ship.shieldActive) {
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`ESCUDO ACTIVO ✓`, W - 14, 26);
+  } else {
+    ctx.fillStyle = 'rgba(100, 255, 100, 0.6)';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`[S] Escudo`, W - 14, 26);
+  }
+
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
@@ -656,6 +705,7 @@ let lastTime = null;
 function loop(ts) {
   const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, 0.05);
   lastTime = ts;
+  gameTime += dt;
   update(dt);
   draw();
   requestAnimationFrame(loop);
