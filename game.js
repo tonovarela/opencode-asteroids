@@ -246,9 +246,237 @@ class GoldParticle {
   }
 }
 
-// ── Ship ──────────────────────────────────────────────────────────────────────
+// ── Skins (definiciones de naves) ─────────────────────────────────────────────
+const SKINS = {
+  classic: {
+    name: 'Clásico',
+    color: '#fff',
+    draw: function() {
+      ctx.beginPath();
+      ctx.moveTo( 20,  0);   // nariz
+      ctx.lineTo(-12, -9);   // ala izquierda
+      ctx.lineTo( -7,  0);   // muesca trasera
+      ctx.lineTo(-12,  9);   // ala derecha
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  diamond: {
+    name: 'Diamante',
+    color: '#00ff00',
+    draw: function() {
+      ctx.beginPath();
+      ctx.moveTo( 18,  0);   // punta frontal
+      ctx.lineTo(  0, -10);  // arriba
+      ctx.lineTo(-14,  0);   // atrás
+      ctx.lineTo(  0,  10);  // abajo
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  pentagon: {
+    name: 'Pentágono',
+    color: '#00ccff',
+    draw: function() {
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+        const x = Math.cos(angle) * 15;
+        const y = Math.sin(angle) * 15;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  square: {
+    name: 'Cuadrado',
+    color: '#ff00ff',
+    draw: function() {
+      ctx.beginPath();
+      ctx.moveTo( 12, -10);
+      ctx.lineTo( 12,  10);
+      ctx.lineTo(-12,  10);
+      ctx.lineTo(-12, -10);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  star: {
+    name: 'Estrella',
+    color: '#ffff00',
+    draw: function() {
+      const pts = 5;
+      const outer = 16;
+      const inner = 8;
+      ctx.beginPath();
+      for (let i = 0; i < pts * 2; i++) {
+        const angle = (i / (pts * 2)) * Math.PI * 2 - Math.PI / 2;
+        const r = i % 2 === 0 ? outer : inner;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  wedge: {
+    name: 'Cuña',
+    color: '#ff6600',
+    draw: function() {
+      ctx.beginPath();
+      ctx.moveTo( 18,  0);   // punta
+      ctx.lineTo(-10, -12);  // ala izquierda ancha
+      ctx.lineTo( -5,  0);   // muesca trasera
+      ctx.lineTo(-10,  12);  // ala derecha ancha
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  compact: {
+    name: 'Compacta',
+    color: '#00ff99',
+    draw: function() {
+      ctx.beginPath();
+      ctx.moveTo( 14,  0);
+      ctx.lineTo( -8, -7);
+      ctx.lineTo( -4,  0);
+      ctx.lineTo( -8,  7);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  },
+  futuristic: {
+    name: 'Futurista',
+    color: '#ff00cc',
+    draw: function() {
+      ctx.beginPath();
+      ctx.moveTo( 20,  0);
+      ctx.lineTo(  5, -8);
+      ctx.lineTo(  0, -6);
+      ctx.lineTo( -2, -12);
+      ctx.lineTo(-12, -4);
+      ctx.lineTo(-12,  4);
+      ctx.lineTo( -2,  12);
+      ctx.lineTo(  0,  6);
+      ctx.lineTo(  5,  8);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+};
+
+const SKIN_KEYS = Object.keys(SKINS);
+
+// ── SkinMenu (menú de selección de skins) ──────────────────────────────────────
+class SkinMenu {
+  constructor() {
+    this.visible = false;
+    this.selectedIndex = 0;
+  }
+
+  toggle() {
+    this.visible = !this.visible;
+  }
+
+  selectNext() {
+    this.selectedIndex = (this.selectedIndex + 1) % SKIN_KEYS.length;
+  }
+
+  selectPrev() {
+    this.selectedIndex = (this.selectedIndex - 1 + SKIN_KEYS.length) % SKIN_KEYS.length;
+  }
+
+  getCurrentSkinKey() {
+    return SKIN_KEYS[this.selectedIndex];
+  }
+
+  getCurrentSkin() {
+    return SKINS[this.getCurrentSkinKey()];
+  }
+
+  draw() {
+    if (!this.visible) return;
+
+    const PADDING = 20;
+    const ITEM_HEIGHT = 32;
+    const PREVIEW_SIZE = 40;
+    const MAX_VISIBLE = 5;
+
+    // Semi-transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    const menuWidth = 280;
+    const menuHeight = Math.min(SKIN_KEYS.length, MAX_VISIBLE) * ITEM_HEIGHT + PADDING * 2 + PREVIEW_SIZE + 20;
+    ctx.fillRect(W - menuWidth - 20, 20, menuWidth, menuHeight);
+
+    // Border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(W - menuWidth - 20, 20, menuWidth, menuHeight);
+
+    // Title
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SKINS', W - menuWidth / 2 - 20, 45);
+
+    // Draw preview of current skin
+    ctx.save();
+    ctx.translate(W - menuWidth / 2 - 20, 70);
+    ctx.strokeStyle = this.getCurrentSkin().color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    this.getCurrentSkin().draw();
+    ctx.restore();
+
+    // List of skins
+    const startY = 110;
+    const visibleStart = Math.max(0, this.selectedIndex - Math.floor(MAX_VISIBLE / 2));
+    const visibleEnd = Math.min(SKIN_KEYS.length, visibleStart + MAX_VISIBLE);
+
+    for (let i = visibleStart; i < visibleEnd; i++) {
+      const skinKey = SKIN_KEYS[i];
+      const skin = SKINS[skinKey];
+      const y = startY + (i - visibleStart) * ITEM_HEIGHT;
+      const isSelected = i === this.selectedIndex;
+
+      // Background highlight for selected
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillRect(W - menuWidth - 15, y - 12, menuWidth - 10, ITEM_HEIGHT - 4);
+      }
+
+      // Skin name
+      ctx.fillStyle = isSelected ? '#fff' : '#aaa';
+      ctx.font = isSelected ? 'bold 13px monospace' : '13px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(skin.name, W - menuWidth + 5, y + 8);
+
+      // Selector indicator
+      if (isSelected) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('→', W - 45, y + 8);
+      }
+    }
+
+    // Instructions
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('↑↓ Navegar • ENTER Confirmar', W - menuWidth / 2 - 20, menuHeight - 5);
+  }
+}
+
+
 class Ship {
-  constructor() { this.reset(); }
+  constructor() { 
+    this.currentSkin = 'classic';
+    this.reset(); 
+  }
 
   reset() {
     this.x      = W / 2;
@@ -311,18 +539,15 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = '#fff';
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
-    // Silueta clásica: triángulo con muesca trasera
-    ctx.beginPath();
-    ctx.moveTo( 20,  0);   // nariz
-    ctx.lineTo(-12, -9);   // ala izquierda
-    ctx.lineTo( -7,  0);   // muesca trasera
-    ctx.lineTo(-12,  9);   // ala derecha
-    ctx.closePath();
-    ctx.stroke();
+    // Obtener el skin actual
+    const skin = SKINS[this.currentSkin];
+    ctx.strokeStyle = skin.color;
+
+    // Dibujar el skin
+    skin.draw();
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
@@ -406,6 +631,7 @@ let ship, bullets, asteroids, particles, powerups, shootingStars;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let skinMenu;    // Menú de skins
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -435,6 +661,7 @@ function spawnShootingStar() {
 
 function initGame() {
   ship          = new Ship();
+  skinMenu      = new SkinMenu();
   bullets       = [];
   asteroids     = [];
   particles     = [];
@@ -475,6 +702,27 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  // Manejo del menú de skins
+  if (pressed('KeyS')) {
+    skinMenu.toggle();
+  }
+
+  if (skinMenu.visible) {
+    // Input del menú
+    if (pressed('ArrowUp')) {
+      skinMenu.selectPrev();
+    }
+    if (pressed('ArrowDown')) {
+      skinMenu.selectNext();
+    }
+    if (pressed('Enter')) {
+      ship.currentSkin = skinMenu.getCurrentSkinKey();
+      skinMenu.toggle();
+    }
+    // Si el menú está abierto, no procesar el resto del update
+    return;
+  }
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -648,6 +896,17 @@ function draw() {
 
   if (state === 'gameover')
     drawOverlay('GAME OVER', `PUNTAJE: ${score}   —   ESPACIO PARA REINICIAR`);
+
+  // Renderizar menú de skins
+  skinMenu.draw();
+
+  // Mostrar instrucción para abrir menú si no está visible
+  if (!skinMenu.visible && state === 'playing') {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('Presiona S para cambiar skin', W - 10, H - 10);
+  }
 }
 
 // ── Loop principal ────────────────────────────────────────────────────────────
