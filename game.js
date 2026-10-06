@@ -489,6 +489,7 @@ class Ship {
     this.invincible    = 3;
     this.shootCooldown = 0;
     this.speedUpTimer  = 0;
+    this.tripleShotTimer = 0;
     this.dead          = false;
     this.shieldActive  = false;
     this.shieldCooldown = 0;
@@ -497,15 +498,16 @@ class Ship {
 
   update(dt) {
     if (this.dead) return;
-    if (this.invincible    > 0) this.invincible    -= dt;
-    if (this.shootCooldown > 0) this.shootCooldown -= dt;
-    if (this.speedUpTimer  > 0) this.speedUpTimer  -= dt;
-    if (this.shieldCooldown > 0) this.shieldCooldown -= dt;
+     if (this.invincible    > 0) this.invincible    -= dt;
+     if (this.shootCooldown > 0) this.shootCooldown -= dt;
+     if (this.speedUpTimer  > 0) this.speedUpTimer  -= dt;
+     if (this.shieldCooldown > 0) this.shieldCooldown -= dt;
+     if (this.tripleShotTimer > 0) this.tripleShotTimer -= dt;
 
-    // Activar/desactivar escudo con tecla S
-    if (pressed('KeyS') && this.shieldCooldown <= 0) {
-      this.shieldActive = !this.shieldActive;
-    }
+     // Activar/desactivar escudo con tecla S
+     if (pressed('KeyS') && this.shieldCooldown <= 0) {
+       this.shieldActive = !this.shieldActive;
+     }
 
     const ROT_BASE   = 3.5;    // rad/s
     const THRUST_BASE = 260;   // px/s²
@@ -537,6 +539,17 @@ class Ship {
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
+    
+    if (this.tripleShotTimer > 0) {
+      // Disparo triple: -15°, 0°, +15°
+      const ANGLE_OFFSET = Math.PI / 12; // 15° en radianes
+      return [
+        new Bullet(ox, oy, this.angle - ANGLE_OFFSET),
+        new Bullet(ox, oy, this.angle),
+        new Bullet(ox, oy, this.angle + ANGLE_OFFSET)
+      ];
+    }
+    
     return [new Bullet(ox, oy, this.angle)];
   }
 
@@ -648,6 +661,37 @@ class PowerUp {
   }
 }
 
+// ── TripleShotPowerUp ─────────────────────────────────────────────────────────
+class TripleShotPowerUp {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 8;
+    this.dead = false;
+    this.pulseTime = 0;
+  }
+
+  update(dt) {
+    this.pulseTime += dt;
+  }
+
+  draw() {
+    const pulse = Math.sin(this.pulseTime * 4) * 0.3 + 0.7; // Pulsación
+    const radius = this.radius * pulse;
+    
+    ctx.fillStyle = 'rgba(0, 150, 255, 0.7)'; // Azul/Cian brillante
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.strokeStyle = 'rgba(0, 150, 255, 1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles, powerups, shootingStars;
 let score, lives, level;
@@ -675,7 +719,13 @@ function spawnPowerUp() {
     x = rand(0, W);
     y = rand(0, H);
   } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
-  powerups.push(new PowerUp(x, y));
+  
+  // 50/50: velocidad o triple-shot
+  if (Math.random() < 0.5) {
+    powerups.push(new PowerUp(x, y));
+  } else {
+    powerups.push(new TripleShotPowerUp(x, y));
+  }
 }
 
 function spawnShootingStar() {
@@ -841,7 +891,13 @@ function update(dt) {
   for (const p of powerups) {
     if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
       p.dead = true;
-      ship.speedUpTimer = 5;  // Activar velocidad por 5 segundos
+      if (p instanceof TripleShotPowerUp) {
+        ship.tripleShotTimer = 5;  // Triple-shot por 5 segundos
+        ship.speedUpTimer = 0;      // Desactivar velocidad si estaba activa
+      } else {
+        ship.speedUpTimer = 5;      // Velocidad por 5 segundos
+        ship.tripleShotTimer = 0;   // Desactivar triple-shot si estaba activo
+      }
     }
   }
   powerups = powerups.filter(p => !p.dead);
@@ -893,27 +949,34 @@ function drawHUD() {
   // Mostrar timer de velocidad si está activo
   if (ship.speedUpTimer > 0) {
     ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText(`VELOCIDAD: ${ship.speedUpTimer.toFixed(1)}s`, W / 2, 50);
-  }
+     ctx.font = 'bold 18px monospace';
+     ctx.fillText(`VELOCIDAD: ${ship.speedUpTimer.toFixed(1)}s`, W / 2, 50);
+   }
 
-  // Mostrar estado del escudo
-  if (ship.shieldCooldown > 0) {
-    ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
-    ctx.font = 'bold 14px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(`ESCUDO RECARGANDO: ${ship.shieldCooldown.toFixed(1)}s`, W - 14, 26);
-  } else if (ship.shieldActive) {
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
-    ctx.font = 'bold 14px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(`ESCUDO ACTIVO ✓`, W - 14, 26);
-  } else {
-    ctx.fillStyle = 'rgba(100, 255, 100, 0.6)';
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(`[S] Escudo`, W - 14, 26);
-  }
+   // Mostrar estado del escudo
+   if (ship.shieldCooldown > 0) {
+     ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
+     ctx.font = 'bold 14px monospace';
+     ctx.textAlign = 'right';
+     ctx.fillText(`ESCUDO RECARGANDO: ${ship.shieldCooldown.toFixed(1)}s`, W - 14, 26);
+   } else if (ship.shieldActive) {
+     ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
+     ctx.font = 'bold 14px monospace';
+     ctx.textAlign = 'right';
+     ctx.fillText(`ESCUDO ACTIVO ✓`, W - 14, 26);
+   } else {
+     ctx.fillStyle = 'rgba(100, 255, 100, 0.6)';
+     ctx.font = '12px monospace';
+     ctx.textAlign = 'right';
+     ctx.fillText(`[S] Escudo`, W - 14, 26);
+   }
+
+   // Mostrar timer de triple-shot si está activo
+   if (ship.tripleShotTimer > 0) {
+     ctx.fillStyle = 'rgba(0, 150, 255, 0.8)';
+     ctx.font = 'bold 18px monospace';
+     ctx.fillText(`TRIPLE SHOT: ${ship.tripleShotTimer.toFixed(1)}s`, W / 2, 50);
+   }
 
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
